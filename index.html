@@ -1,31 +1,147 @@
-<!DOCTYPE html>
-<!-- A placeholder from the Home Sales template. Replace this file with your site's first page. -->
+<!doctype html>
 <html lang="en">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Under construction</title>
-  <!-- An empty icon, so the browser doesn't log an error looking for favicon.ico -->
+  <title>Home prices in college towns</title>
   <link rel="icon" href="data:,">
   <style>
-    :root { color-scheme: light dark; }
-    body {
-      max-width: 40rem;
-      margin: 0 auto;
-      padding: 3rem 1rem;
-      font-family: system-ui, sans-serif;
-      line-height: 1.5;
-    }
-    footer { margin-top: 3rem; font-size: 0.875rem; opacity: 0.75; }
+    :root { color-scheme: light; font-family: system-ui, sans-serif; color: #172b3a; background: #f6f8f7; }
+    * { box-sizing: border-box; }
+    body { max-width: 76rem; margin: 0 auto; padding: 2.5rem 1.25rem; line-height: 1.5; }
+    h1 { margin: 0; font-size: clamp(2rem, 5vw, 3.25rem); letter-spacing: -.04em; }
+    .intro { max-width: 44rem; color: #526472; font-size: 1.08rem; }
+    .note { padding: .85rem 1rem; background: #e9f1ee; border-left: 4px solid #26745d; border-radius: .25rem; }
+    .chart-wrap { margin: 2rem 0; padding: 1.25rem; background: white; border: 1px solid #dce4e1; border-radius: .75rem; }
+    .chart-wrap h2, h2 { margin-top: 0; }
+    #chart { display: block; width: 100%; height: auto; overflow: visible; }
+    .axis { fill: #586a75; font-size: 12px; }
+    .grid { stroke: #e5ebe8; stroke-width: 1; }
+    .bar { fill: #26745d; }
+    .bar:hover { fill: #164f40; }
+    .city-label { fill: #263b47; font-size: 13px; }
+    .value-label { fill: #172b3a; font-size: 12px; font-weight: 650; }
+    .table-wrap { overflow-x: auto; background: white; border: 1px solid #dce4e1; border-radius: .75rem; }
+    table { width: 100%; border-collapse: collapse; text-align: left; }
+    th, td { padding: .75rem 1rem; border-bottom: 1px solid #e5ebe8; }
+    th { color: #526472; font-size: .85rem; }
+    td.price, th.price { text-align: right; font-variant-numeric: tabular-nums; }
+    tbody tr:last-child td { border-bottom: 0; }
+    footer { margin-top: 2.5rem; color: #526472; font-size: .9rem; }
+    @media (max-width: 560px) { body { padding: 1.5rem .75rem; } .chart-wrap { padding: .75rem; } }
   </style>
 </head>
 <body>
   <main>
-    <h1>This site is under construction</h1>
-    <p>It will show findings from the College-town home sales dataset.</p>
+    <h1>What does a home cost in a college town?</h1>
+    <p class="intro">Median sale prices across 18 towns near 11 university campuses. Each bar and table row shows the middle sale price for that town.</p>
+    <p class="note">Prices are medians of completed sales at $1,000 or more. The data description flags some prices as implausible; this threshold follows its stated rule for reported medians.</p>
+    <section class="chart-wrap" aria-labelledby="chart-heading">
+      <h2 id="chart-heading">Median sale price by town</h2>
+      <svg id="chart" role="img" aria-labelledby="chart-heading chart-description"></svg>
+      <p id="chart-description" class="intro">Horizontal bars are ordered from lowest to highest median sale price. Values are rounded to whole dollars.</p>
+    </section>
+    <section aria-labelledby="table-heading">
+      <h2 id="table-heading">Prices in every town</h2>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th scope="col">Town</th><th scope="col">State</th><th scope="col">Sales included</th><th scope="col" class="price">Median sale price</th></tr></thead>
+          <tbody id="price-rows"></tbody>
+        </table>
+      </div>
+    </section>
   </main>
-  <footer>
-    <p>Data: College-town home sales dataset, version 1.0 (2026). University of Illinois-Deloitte Foundation Center for Business Emerging Technologies. Data collected March 2026.</p>
-  </footer>
+  <footer>Source: College-town home sales dataset, version 1.0 (2026). University of Illinois-Deloitte Foundation Center for Business Emerging Technologies. Collected March 2026.</footer>
+  <script>
+    const wholeDollar = new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 });
+    const svgNS = 'http://www.w3.org/2000/svg';
+
+    function median(values) {
+      values.sort((a, b) => a - b);
+      const middle = Math.floor(values.length / 2);
+      return values.length % 2 ? values[middle] : (values[middle - 1] + values[middle]) / 2;
+    }
+
+    function svgElement(name, attributes, content) {
+      const element = document.createElementNS(svgNS, name);
+      for (const [key, value] of Object.entries(attributes)) element.setAttribute(key, value);
+      if (content !== undefined) element.textContent = content;
+      return element;
+    }
+
+    function drawChart(rows) {
+      const svg = document.querySelector('#chart');
+      const width = 960;
+      const left = 150;
+      const right = 130;
+      const top = 12;
+      const rowHeight = 31;
+      const bottom = 38;
+      const max = Math.ceil(rows[rows.length - 1].median / 100000) * 100000;
+      const plotWidth = width - left - right;
+      const height = top + rows.length * rowHeight + bottom;
+      svg.setAttribute('viewBox', `0 0 ${width} ${height}`);
+      svg.replaceChildren();
+
+      for (let value = 0; value <= max; value += 100000) {
+        const x = left + (value / max) * plotWidth;
+        svg.append(svgElement('line', { x1: x, y1: top, x2: x, y2: height - bottom, class: 'grid' }));
+        svg.append(svgElement('text', { x, y: height - 11, 'text-anchor': 'middle', class: 'axis' }, wholeDollar.format(value)));
+      }
+      rows.forEach((row, index) => {
+        const y = top + index * rowHeight;
+        const barWidth = (row.median / max) * plotWidth;
+        svg.append(svgElement('text', { x: left - 10, y: y + 19, 'text-anchor': 'end', class: 'city-label' }, row.city));
+        svg.append(svgElement('rect', { x: left, y: y + 4, width: barWidth, height: 19, rx: 3, class: 'bar' }));
+        svg.append(svgElement('text', { x: left + barWidth + 8, y: y + 19, class: 'value-label' }, wholeDollar.format(row.median)));
+      });
+    }
+
+    fetch('data/college_town_home_sales.csv')
+      .then(response => {
+        if (!response.ok) throw new Error(`Could not load sales data (${response.status})`);
+        return response.text();
+      })
+      .then(csv => {
+        const lines = csv.trim().split(/\r?\n/);
+        const headers = lines.shift().split(',');
+        const cityIndex = headers.indexOf('city');
+        const stateIndex = headers.indexOf('state');
+        const priceIndex = headers.indexOf('sale_price');
+        const byTown = new Map();
+        for (const line of lines) {
+          const fields = line.split(',');
+          const price = Number(fields[priceIndex]);
+          if (!Number.isFinite(price) || price < 1000) continue;
+          const city = fields[cityIndex];
+          const state = fields[stateIndex];
+          const key = `${city},${state}`;
+          if (!byTown.has(key)) byTown.set(key, { city, state, prices: [] });
+          byTown.get(key).prices.push(price);
+        }
+        const rows = [...byTown.values()]
+          .map(town => ({ ...town, count: town.prices.length, median: median(town.prices) }))
+          .sort((a, b) => a.median - b.median || a.city.localeCompare(b.city));
+        const body = document.querySelector('#price-rows');
+        body.replaceChildren(...rows.map(row => {
+          const tr = document.createElement('tr');
+          for (const value of [row.city, row.state, row.count.toLocaleString('en-US')]) {
+            const td = document.createElement('td');
+            td.textContent = value;
+            tr.append(td);
+          }
+          const priceCell = document.createElement('td');
+          priceCell.className = 'price';
+          priceCell.textContent = wholeDollar.format(row.median);
+          tr.append(priceCell);
+          return tr;
+        }));
+        drawChart(rows);
+      })
+      .catch(error => {
+        document.querySelector('#price-rows').innerHTML = '<tr><td colspan="4">Price data could not be loaded. Please try again later.</td></tr>';
+        document.querySelector('#chart-description').textContent = error.message;
+      });
+  </script>
 </body>
 </html>
