@@ -35,7 +35,7 @@
   <main>
     <h1>What does a home cost in a college town?</h1>
     <p class="intro">Median sale prices across 18 towns near 11 university campuses. Each bar and table row shows the middle sale price for that town.</p>
-    <p class="note">Prices are medians of completed sales at $1,000 or more. The data description flags some prices as implausible; this threshold follows its stated rule for reported medians.</p>
+    <p class="note">Sales under $10,000 are left out because the data description flags them as implausible. Every median on this page is computed from the remaining completed sales.</p>
     <section class="chart-wrap" aria-labelledby="chart-heading">
       <h2 id="chart-heading">Median sale price by town</h2>
       <svg id="chart" role="img" aria-labelledby="chart-heading chart-description"></svg>
@@ -60,6 +60,38 @@
       values.sort((a, b) => a - b);
       const middle = Math.floor(values.length / 2);
       return values.length % 2 ? values[middle] : (values[middle - 1] + values[middle]) / 2;
+    }
+
+    function parseCSV(text) {
+      const rows = [];
+      let row = [];
+      let field = '';
+      let quoted = false;
+
+      for (let index = 0; index < text.length; index += 1) {
+        const character = text[index];
+        const nextCharacter = text[index + 1];
+        if (character === '"' && quoted && nextCharacter === '"') {
+          field += '"';
+          index += 1;
+        } else if (character === '"') {
+          quoted = !quoted;
+        } else if (character === ',' && !quoted) {
+          row.push(field);
+          field = '';
+        } else if ((character === '\n' || character === '\r') && !quoted) {
+          if (character === '\r' && nextCharacter === '\n') index += 1;
+          row.push(field);
+          if (row.some(value => value !== '')) rows.push(row);
+          row = [];
+          field = '';
+        } else {
+          field += character;
+        }
+      }
+      row.push(field);
+      if (row.some(value => value !== '')) rows.push(row);
+      return rows;
     }
 
     function svgElement(name, attributes, content) {
@@ -103,16 +135,15 @@
         return response.text();
       })
       .then(csv => {
-        const lines = csv.trim().split(/\r?\n/);
-        const headers = lines.shift().split(',');
+        const records = parseCSV(csv);
+        const headers = records.shift();
         const cityIndex = headers.indexOf('city');
         const stateIndex = headers.indexOf('state');
         const priceIndex = headers.indexOf('sale_price');
         const byTown = new Map();
-        for (const line of lines) {
-          const fields = line.split(',');
+        for (const fields of records) {
           const price = Number(fields[priceIndex]);
-          if (!Number.isFinite(price) || price < 1000) continue;
+          if (!Number.isFinite(price) || price < 10000) continue;
           const city = fields[cityIndex];
           const state = fields[stateIndex];
           const key = `${city},${state}`;
